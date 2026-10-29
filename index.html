@@ -20,17 +20,22 @@
 <body>
 
 <div id="loginPanel" class="panel-login">
+  <div style="text-align: center;">
+    <img src="icon-192.png" alt="Logo AbsensiPro" class="login-logo">
+  </div>
   <h2>Masuk AbsensiPro</h2>
   <label>Email kerja<input id="email" type="email" placeholder="nama@perusahaan.com"></label>
   <label>Kata sandi<input id="password" type="password" placeholder="Kata sandi"></label>
   <button id="loginBtn">Masuk</button>
   <p id="loginMsg" class="msg" aria-live="polite"></p>
-  <p class="muted"><a href="#" id="showForgot">Lupa kata sandi?</a></p>
   <p class="muted">Karyawan baru? <a href="#" id="showRegister">Daftar akun</a></p>
 </div>
 
 <!-- PANEL LUPA KATA SANDI (tanpa email: verifikasi email + NIK terdaftar) -->
 <div id="forgotPanel" class="panel-login hidden">
+  <div style="text-align: center;">
+    <img src="icon-192.png" alt="Logo AbsensiPro" class="login-logo">
+  </div>
   <h2>Lupa Kata Sandi</h2>
   <p class="muted">Masukkan email dan NIK yang didaftarkan admin, lalu buat kata sandi baru.</p>
   <label>Email kerja<input id="forgotEmail" type="email" placeholder="Email yang didaftarkan admin" autocomplete="off"></label>
@@ -43,6 +48,9 @@
 </div>
 
 <div id="registerPanel" class="panel-login hidden">
+  <div style="text-align: center;">
+    <img src="icon-192.png" alt="Logo AbsensiPro" class="login-logo">
+  </div>
   <h2>Daftar Akun Karyawan</h2>
   <label>Email kerja<input id="regEmail" type="email" placeholder="Email yang didaftarkan admin"></label>
   <label>Kata sandi<input id="regPassword" type="password" placeholder="Minimal 8 karakter"></label>
