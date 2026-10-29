@@ -952,8 +952,8 @@ async function buildRecapExcel() {
     ws.getCell("A2").alignment = { horizontal: "center" };
 
     const info = [
-      ["Nama", g.name],
       ["Nama Pekerjaan", g.namaPekerjaan],
+      ["Nama", g.name],
       ["Jabatan", g.jabatan],
       ["Periode", period],
       ["Jumlah Hari Hadir", `${countHadir(g.rows)} hari`]
