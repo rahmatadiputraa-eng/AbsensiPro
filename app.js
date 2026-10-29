@@ -1074,8 +1074,8 @@ async function buildRecapPdf() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     const info = [
-      ["Nama", g.name],
       ["Nama Pekerjaan", g.namaPekerjaan],
+      ["Nama", g.name],
       ["Jabatan", g.jabatan],
       ["Periode", period],
       ["Jumlah Hari Hadir", `${countHadir(g.rows)} hari`]
