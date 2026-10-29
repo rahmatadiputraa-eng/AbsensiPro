@@ -56,6 +56,83 @@ function getLocation() {
   });
 }
 
+// --- PETA LOKASI LIVE (Leaflet + OpenStreetMap) ---
+let liveMap = null, liveMarker = null, liveAccuracyCircle = null;
+let liveWatchId = null, liveFollow = true, liveFirstFix = true;
+
+function setLiveMapStatus(text, error=false) {
+  const el = $("liveMapStatus");
+  if (el) { el.textContent = text; el.style.color = error ? "#b91c1c" : ""; }
+}
+
+function startLiveMap() {
+  if (typeof L === "undefined") { setLiveMapStatus("Peta gagal dimuat. Periksa koneksi internet.", true); return; }
+  if (!navigator.geolocation) { setLiveMapStatus("Browser tidak mendukung GPS/lokasi.", true); return; }
+
+  if (!liveMap) {
+    liveMap = L.map("liveMap", { zoomControl: true }).setView([-2.5, 118], 5);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap"
+    }).addTo(liveMap);
+    // Pengguna menggeser peta sendiri: hentikan auto-ikuti sampai menekan "Pusatkan"
+    liveMap.on("dragstart", () => { liveFollow = false; });
+  }
+  // Peta dibuat saat kontainer baru ditampilkan; hitung ulang ukurannya
+  setTimeout(() => liveMap && liveMap.invalidateSize(), 150);
+
+  if (liveWatchId !== null) return; // sudah berjalan
+  liveFirstFix = true;
+  liveFollow = true;
+  setLiveMapStatus("Mencari lokasi…");
+
+  liveWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const { latitude, longitude, accuracy } = pos.coords;
+      const ll = [latitude, longitude];
+
+      if (!liveMarker) {
+        liveMarker = L.circleMarker(ll, { radius: 9, color: "#fff", weight: 3, fillColor: "#2563eb", fillOpacity: 1 }).addTo(liveMap);
+        liveAccuracyCircle = L.circle(ll, { radius: accuracy, color: "#2563eb", weight: 1, fillColor: "#2563eb", fillOpacity: 0.12 }).addTo(liveMap);
+      } else {
+        liveMarker.setLatLng(ll);
+        liveAccuracyCircle.setLatLng(ll).setRadius(accuracy);
+      }
+
+      if (liveFirstFix) { liveMap.setView(ll, 17); liveFirstFix = false; }
+      else if (liveFollow) { liveMap.panTo(ll); }
+
+      const jam = new Date(pos.timestamp).toLocaleTimeString("id-ID");
+      const lemah = accuracy > 100 ? " — sinyal GPS lemah, coba di tempat terbuka" : "";
+      setLiveMapStatus(`Akurasi ±${Math.round(accuracy)} m • diperbarui ${jam}${lemah}`, accuracy > 100);
+    },
+    (err) => {
+      const msg = err.code === 1
+        ? "Izin lokasi ditolak. Aktifkan izin lokasi untuk situs ini di pengaturan browser."
+        : err.code === 2 ? "Lokasi tidak tersedia. Pastikan GPS aktif."
+        : "Waktu pencarian lokasi habis. Coba lagi.";
+      setLiveMapStatus(msg, true);
+      stopLiveMap(false);
+    },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+  );
+}
+
+function stopLiveMap(clearMarker = false) {
+  if (liveWatchId !== null) { navigator.geolocation.clearWatch(liveWatchId); liveWatchId = null; }
+  if (clearMarker && liveMap) {
+    if (liveMarker) { liveMap.removeLayer(liveMarker); liveMarker = null; }
+    if (liveAccuracyCircle) { liveMap.removeLayer(liveAccuracyCircle); liveAccuracyCircle = null; }
+    setLiveMapStatus("Mencari lokasi…");
+  }
+}
+
+if ($("recenterMapBtn")) $("recenterMapBtn").onclick = () => {
+  liveFollow = true;
+  if (liveMarker && liveMap) { liveMap.setView(liveMarker.getLatLng(), Math.max(liveMap.getZoom(), 17)); }
+  else { stopLiveMap(false); startLiveMap(); }   // coba lagi setelah error / izin ditolak
+};
+
 async function loadProfile() {
   const {data, error} = await supabaseClient
     .from("profiles")
@@ -217,6 +294,7 @@ async function openPhoto(path) {
 
 // Bersihkan semua sisa sesi sebelumnya (foto, kegiatan, pesan, tabel) agar tidak terbawa ke akun lain
 function resetAttendanceForm() {
+  stopLiveMap(true);
   const prev = $("photoPreview");
   if (prev && prev.src && prev.src.startsWith("blob:")) { try { URL.revokeObjectURL(prev.src); } catch(e) {} }
   capturedBlob = null;
@@ -253,7 +331,7 @@ function initCamera(type) {
   show("captureBtn", true);
   show("retakeBtn", false);
   show("attendanceBtn", false);
-  message("attendanceMsg", `Klik "Ambil Foto Selfie" untuk membuka kamera (${isCheckIn ? "Check-in" : "Check-out"}).`);
+  message("attendanceMsg", `Klik "Ambil Foto Selfie" untuk membuka kamera depan (${isCheckIn ? "Check-in" : "Check-out"}).`);
 }
 
 if ($("btnCheckIn")) $("btnCheckIn").onclick = () => initCamera("check_in");
@@ -396,7 +474,8 @@ function switchEmployeeTab(targetId) {
   document.querySelectorAll(".emp-tab-content").forEach(el => el.classList.add("hidden"));
   show(targetId, true);
   setActiveNav(targetId);
-  if(targetId === "tabEmpHome") loadEmployeeDashboardStats();
+  if(targetId === "tabEmpHome") { loadEmployeeDashboardStats(); startLiveMap(); }
+  else stopLiveMap(false);   // hemat baterai saat bukan di Beranda
   if(targetId === "tabEmpHistory") loadMyRows();
   if(targetId === "tabEmpProfile") loadEmployeeProfileData();
 }
