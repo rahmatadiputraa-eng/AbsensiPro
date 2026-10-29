@@ -253,7 +253,7 @@ function initCamera(type) {
   show("captureBtn", true);
   show("retakeBtn", false);
   show("attendanceBtn", false);
-  message("attendanceMsg", `Klik "Ambil Foto Selfie" untuk membuka kamera depan (${isCheckIn ? "Check-in" : "Check-out"}).`);
+  message("attendanceMsg", `Klik "Ambil Foto Selfie" untuk membuka kamera (${isCheckIn ? "Check-in" : "Check-out"}).`);
 }
 
 if ($("btnCheckIn")) $("btnCheckIn").onclick = () => initCamera("check_in");
