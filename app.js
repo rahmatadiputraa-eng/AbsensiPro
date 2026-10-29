@@ -215,6 +215,28 @@ async function openPhoto(path) {
   window.open(data.signedUrl, "_blank", "noopener");
 }
 
+// Bersihkan semua sisa sesi sebelumnya (foto, kegiatan, pesan, tabel) agar tidak terbawa ke akun lain
+function resetAttendanceForm() {
+  const prev = $("photoPreview");
+  if (prev && prev.src && prev.src.startsWith("blob:")) { try { URL.revokeObjectURL(prev.src); } catch(e) {} }
+  capturedBlob = null;
+  currentCheckType = "check_in";
+  if (prev) { prev.removeAttribute("src"); }
+  if ($("selfieInput")) $("selfieInput").value = "";
+  if ($("activityInput")) $("activityInput").value = "";
+  show("photoPreview", false);
+  show("captureBtn", false);
+  show("retakeBtn", false);
+  show("attendanceBtn", false);
+  show("cameraSection", false);
+  show("activityGroup", false);
+  show("camInstruction", true);
+  message("attendanceMsg", "");
+  if ($("myRows")) $("myRows").innerHTML = "";
+  ["curPassword", "chgPassword", "chgPassword2"].forEach(id => { if ($(id)) $(id).value = ""; });
+  message("changePwMsg", "");
+}
+
 function initCamera(type) {
   currentCheckType = type;
   const isCheckIn = (type === "check_in");
@@ -1087,6 +1109,11 @@ async function boot() {
       return;
     }
 
+    // Akun berganti (atau login baru): buang sisa form akun sebelumnya
+    if(!currentUser || prevUserId !== currentUser.id) {
+      resetAttendanceForm();
+    }
+
     if(currentUser) {
       try {
         await loadProfile(); 
@@ -1101,6 +1128,7 @@ async function boot() {
     } else {
       currentProfile = null;
       try { localStorage.removeItem("activeTab"); } catch(e) {}
+      ["email", "password"].forEach(id => { if ($(id)) $(id).value = ""; });
       await refreshUI();
     }
   });
