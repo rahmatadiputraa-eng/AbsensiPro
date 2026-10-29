@@ -195,6 +195,11 @@ th {
   box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
+.panel-login h2 {
+  text-align: center;
+  margin-bottom: 1.5rem; /* Menambah jarak bawah agar lebih rapi dari form input */
+}
+
 .modal-panel {
   position: fixed;
   top: 10%;
