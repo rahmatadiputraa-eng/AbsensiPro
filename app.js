@@ -579,6 +579,7 @@ if ($("openAddEmpBtn")) {
     $("empEmailInput").disabled = false;
     $("empNikInput").value = "";
     $("empJabatanInput").value = "";
+    $("empNamaPekerjaanInput").value = "";
     $("empPhoneInput").value = "";
     $("empRoleInput").value = "employee";
     show("empModal", true);
@@ -597,6 +598,7 @@ window.editEmployee = (id) => {
   $("empEmailInput").disabled = true; // email login tidak diubah dari sini
   $("empNikInput").value = emp.nik || "";
   $("empJabatanInput").value = emp.jabatan || "";
+  $("empNamaPekerjaanInput").value = emp.nama_pekerjaan || "";
   $("empPhoneInput").value = emp.phone || "";
   $("empRoleInput").value = emp.role || "employee";
   show("empModal", true);
@@ -609,12 +611,13 @@ if ($("saveEmpBtn")) {
     const email = $("empEmailInput").value.trim().toLowerCase();
     const nik = $("empNikInput").value.trim();
     const jabatan = $("empJabatanInput").value.trim();
+    const nama_pekerjaan = $("empNamaPekerjaanInput").value.trim();
     const phone = $("empPhoneInput").value.trim();
     const role = $("empRoleInput").value;
 
     if(!full_name || !email) { alert("Nama dan email wajib diisi!"); return; }
 
-    const fields = { full_name, nik: nik || null, jabatan: jabatan || null, phone: phone || null, role };
+    const fields = { full_name, nik: nik || null, jabatan: jabatan || null, nama_pekerjaan: nama_pekerjaan || null, phone: phone || null, role };
 
     $("saveEmpBtn").disabled = true;
     try {
@@ -676,7 +679,11 @@ function recapPeriodText() {
 function groupRecapByEmployee() {
   const map = new Map();
   lastRecapData.forEach(r => {
-    if (!map.has(r.userId)) map.set(r.userId, { name: r.name, jabatan: r.jabatan, rows: [] });
+    if (!map.has(r.userId)) {
+      // Nama Pekerjaan diambil dari data karyawan (employee_registry)
+      const emp = allEmployees.find(e => e.user_id === r.userId);
+      map.set(r.userId, { name: r.name, jabatan: r.jabatan, namaPekerjaan: emp?.nama_pekerjaan || "-", rows: [] });
+    }
     map.get(r.userId).rows.push(r);
   });
   return Array.from(map.values());
@@ -946,6 +953,7 @@ async function buildRecapExcel() {
 
     const info = [
       ["Nama", g.name],
+      ["Nama Pekerjaan", g.namaPekerjaan],
       ["Jabatan", g.jabatan],
       ["Periode", period],
       ["Jumlah Hari Hadir", `${countHadir(g.rows)} hari`]
@@ -958,8 +966,8 @@ async function buildRecapExcel() {
       ws.getCell(`B${r}`).value = `: ${val}`;
     });
 
-    // Header tabel (baris 9)
-    const headRow = ws.getRow(9);
+    // Header tabel (baris 10; info karyawan di baris 4-8)
+    const headRow = ws.getRow(10);
     HEADERS.forEach((t, i) => {
       const c = headRow.getCell(i + 1);
       c.value = t;
@@ -1067,6 +1075,7 @@ async function buildRecapPdf() {
     doc.setFontSize(10);
     const info = [
       ["Nama", g.name],
+      ["Nama Pekerjaan", g.namaPekerjaan],
       ["Jabatan", g.jabatan],
       ["Periode", period],
       ["Jumlah Hari Hadir", `${countHadir(g.rows)} hari`]
