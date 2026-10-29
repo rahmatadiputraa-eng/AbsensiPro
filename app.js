@@ -96,11 +96,24 @@ async function refreshUI() {
 
   const name = currentProfile?.full_name || currentUser.email;
   const role = currentProfile?.role || "belum diatur";
-  
-  $("welcome").textContent = role === "admin" ? "Dashboard Admin" : `Halo, ${name}`;
 
   const isEmployee = (role === "employee");
   const isAdmin = (role === "admin");
+
+  // Tampilkan logo di header khusus untuk karyawan
+  const headerLogo = $("headerLogo");
+  if (headerLogo) {
+    headerLogo.style.display = isEmployee ? "block" : "none";
+  }
+
+  // Ubah teks header atas berdasarkan peran
+  if (isEmployee) {
+    $("welcome").textContent = "PT. Agrinas Palma Nusantara";
+  } else {
+    $("welcome").textContent = "Dashboard Admin";
+  }
+  
+
 
   // Tampilkan grup menu sidebar yang sesuai peran
   const adminMenuGroup = document.querySelector(".admin-menu-group");
