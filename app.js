@@ -96,23 +96,11 @@ async function refreshUI() {
 
   const name = currentProfile?.full_name || currentUser.email;
   const role = currentProfile?.role || "belum diatur";
+  
+  $("welcome").textContent = role === "admin" ? "Dashboard Admin" : `Halo, ${name}`;
 
   const isEmployee = (role === "employee");
   const isAdmin = (role === "admin");
-
-  // Tampilkan logo di header khusus untuk karyawan
-  const headerLogo = $("headerLogo");
-  if (headerLogo) {
-    headerLogo.style.display = isEmployee ? "block" : "none";
-  }
-
-  // Ubah teks header atas berdasarkan peran
-  if (isEmployee) {
-    $("welcome").textContent = "PT. Agrinas Palma Nusantara";
-  } else {
-    $("welcome").textContent = "Dashboard Admin";
-  }
-
 
   // Tampilkan grup menu sidebar yang sesuai peran
   const adminMenuGroup = document.querySelector(".admin-menu-group");
@@ -214,66 +202,89 @@ async function openPhoto(path) {
   window.open(data.signedUrl, "_blank", "noopener");
 }
 
-async function initCamera(type) {
+function initCamera(type) {
   currentCheckType = type;
   const isCheckIn = (type === "check_in");
-  
+
+  // Reset foto sebelumnya bila pengguna berganti antara check-in / check-out
+  capturedBlob = null;
+  if ($("photoPreview")) { $("photoPreview").src = ""; }
+  if ($("selfieInput")) { $("selfieInput").value = ""; }
+
   show("activityGroup", isCheckIn);
   show("cameraSection", true);
   show("camInstruction", false);
-
-  try {
-    message("attendanceMsg", `Membuka kamera untuk ${isCheckIn ? 'Check-in' : 'Check-out'}…`);
-    mediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-    const video = $("videoElement");
-    video.srcObject = mediaStream;
-    show("videoElement", true);
-    show("photoPreview", false);
-    show("captureBtn", true);
-    show("retakeBtn", false);
-    show("attendanceBtn", false);
-  } catch (err) {
-    message("attendanceMsg", "Gagal mengakses kamera: " + err.message + ". Pastikan izin kamera diberikan.", true);
-  }
+  show("photoPreview", false);
+  show("captureBtn", true);
+  show("retakeBtn", false);
+  show("attendanceBtn", false);
+  message("attendanceMsg", `Klik "Ambil Foto Selfie" untuk membuka kamera depan (${isCheckIn ? "Check-in" : "Check-out"}).`);
 }
 
 if ($("btnCheckIn")) $("btnCheckIn").onclick = () => initCamera("check_in");
 if ($("btnCheckOut")) $("btnCheckOut").onclick = () => initCamera("check_out");
 
-if ($("captureBtn")) $("captureBtn").onclick = () => {
-  const video = $("videoElement");
-  const canvas = $("canvasElement");
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+// Tombol ini membuka aplikasi kamera bawaan HP (kamera depan)
+function openNativeCamera() {
+  const input = $("selfieInput");
+  if (!input) return;
+  input.value = "";   // supaya memilih/mengambil foto yang sama tetap memicu event change
+  input.click();
+}
+if ($("captureBtn")) $("captureBtn").onclick = openNativeCamera;
+if ($("retakeBtn")) $("retakeBtn").onclick = openNativeCamera;
 
-  canvas.toBlob((blob) => {
-    capturedBlob = blob;
-    const imageUrl = URL.createObjectURL(blob);
-    $("photoPreview").src = imageUrl;
-    
-    if (mediaStream) {
-      mediaStream.getTracks().forEach(track => track.stop());
-      mediaStream = null;
-    }
+// Perkecil foto (maks 1024px) agar unggahan cepat & hemat kuota
+async function compressImage(file, maxSide = 1024, quality = 0.8) {
+  let bitmap;
+  if (window.createImageBitmap) {
+    try { bitmap = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (e) {}
+  }
+  if (!bitmap) {
+    bitmap = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("File gambar tidak dapat dibaca."));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+  const w = bitmap.width, h = bitmap.height;
+  const scale = Math.min(1, maxSide / Math.max(w, h));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(w * scale);
+  canvas.height = Math.round(h * scale);
+  canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  if (bitmap.close) bitmap.close();
+  return await new Promise((resolve, reject) => {
+    canvas.toBlob(b => b ? resolve(b) : reject(new Error("Gagal memproses foto.")), "image/jpeg", quality);
+  });
+}
 
-    show("videoElement", false);
+if ($("selfieInput")) $("selfieInput").onchange = async (ev) => {
+  const file = ev.target.files && ev.target.files[0];
+  if (!file) { message("attendanceMsg", "Pengambilan foto dibatalkan. Klik \"Ambil Foto Selfie\" untuk mencoba lagi.", true); return; }
+  if (!file.type.startsWith("image/")) { message("attendanceMsg", "File harus berupa foto.", true); return; }
+
+  // Foto harus baru diambil (bukan foto lama dari galeri)
+  if (file.lastModified && Date.now() - file.lastModified > 10 * 60 * 1000) {
+    message("attendanceMsg", "Foto terlalu lama. Silakan ambil foto selfie yang baru langsung dari kamera.", true);
+    ev.target.value = "";
+    return;
+  }
+
+  try {
+    message("attendanceMsg", "Memproses foto…");
+    capturedBlob = await compressImage(file);
+    $("photoPreview").src = URL.createObjectURL(capturedBlob);
     show("photoPreview", true);
     show("captureBtn", false);
     show("retakeBtn", true);
     show("attendanceBtn", true);
     message("attendanceMsg", "Foto selfie berhasil diambil. Silakan klik kirim absensi.");
-  }, "image/jpeg", 0.85);
-};
-
-if ($("retakeBtn")) $("retakeBtn").onclick = () => {
-  capturedBlob = null;
-  $("photoPreview").src = "";
-  show("photoPreview", false);
-  show("retakeBtn", false);
-  show("attendanceBtn", false);
-  initCamera(currentCheckType);
+  } catch (e) {
+    capturedBlob = null;
+    message("attendanceMsg", e.message || "Gagal memproses foto.", true);
+  }
 };
 
 async function submitAttendance() {
@@ -281,7 +292,7 @@ async function submitAttendance() {
   const activity = isCheckIn ? $("activityInput").value.trim() : "-";
 
   if (!capturedBlob) {
-    message("attendanceMsg", "Harap ambil foto selfie melalui kamera terlebih dahulu.", true);
+    message("attendanceMsg", "Harap ambil foto selfie terlebih dahulu.", true);
     return;
   }
   if (isCheckIn && !activity) {
