@@ -12,6 +12,8 @@
   <meta name="apple-mobile-web-app-title" content="AbsensiPro">
   <title>AbsensiPro</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -140,6 +142,16 @@
           <span class="muted" style="font-size: 0.85rem;">Terlambat (> 08:00)</span>
           <h2 id="statTerlambatBulanIni" style="margin: 6px 0 0; color: #d97706;">0</h2>
         </div>
+      </div>
+
+      <!-- Peta lokasi live -->
+      <div class="panel" style="background: white; padding: 16px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 1.5rem;">
+        <div class="row spread" style="align-items: center;">
+          <h3 style="margin: 0;">📍 Lokasi Anda Saat Ini</h3>
+          <button type="button" id="recenterMapBtn" class="secondary">Pusatkan</button>
+        </div>
+        <div id="liveMap" style="height: 240px; border-radius: 8px; margin-top: 0.75rem; isolation: isolate; background: #e2e8f0;"></div>
+        <p id="liveMapStatus" class="muted" style="margin: 0.5rem 0 0; font-size: 0.85rem;" aria-live="polite">Mencari lokasi…</p>
       </div>
 
       <div class="panel" style="background: white; padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
