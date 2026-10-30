@@ -190,42 +190,33 @@ async function refreshUI() {
     $("welcome").textContent = "Dashboard Admin";
   }
   
-
-
-  // Tampilkan grup menu sidebar yang sesuai peran
+   // Tampilkan grup menu sidebar yang sesuai peran
   const adminMenuGroup = document.querySelector(".admin-menu-group");
   const employeeMenuGroup = document.querySelector(".employee-menu-group");
   if(adminMenuGroup) adminMenuGroup.classList.toggle("hidden", !isAdmin);
-  if(employeeMenuGroup) employeeMenuGroup.classList.toggle("hidden", !isEmployee);
+  if(employeeMenuGroup) employeeMenuGroup.classList.toggle("hidden", !(isEmployee || isAdmin));
 
   show("adminArea", isAdmin);
 
-  if(isEmployee) {
-    // Ambil tab terakhir karyawan dari localStorage, atau default ke tabEmpHome
-    const savedTab = localStorage.getItem("activeTab");
-    const validEmpTabs = ["tabEmpHome", "tabEmpHistory", "tabEmpProfile"];
-    const targetTab = validEmpTabs.includes(savedTab) ? savedTab : "tabEmpHome";
-
-    switchEmployeeTab(targetTab);
+  if(isEmployee || isAdmin) {
     if($("employeeWelcomeMsg")) $("employeeWelcomeMsg").textContent = `Selamat Datang, ${name}!`;
     startLiveClock();
+  } else if (clockInterval) clearInterval(clockInterval);
+
+  const savedTab = localStorage.getItem("activeTab");
+  const validEmpTabs = ["tabEmpHome", "tabEmpHistory", "tabEmpProfile"];
+  const validAdminTabs = ["tabSummary", "tabEmployees", "tabRecap"];
+
+  if(isEmployee) {
+    switchEmployeeTab(validEmpTabs.includes(savedTab) ? savedTab : "tabEmpHome");
     await loadEmployeeDashboardStats();
     await loadMyRows();
     loadEmployeeProfileData();
-  } else {
-    if (clockInterval) clearInterval(clockInterval);
   }
 
   if(isAdmin) {
-    // Pastikan tab karyawan tidak ikut tampil di sisi admin
-    document.querySelectorAll(".emp-tab-content").forEach(el => el.classList.add("hidden"));
-    
-    // Ambil tab terakhir admin dari localStorage, atau default ke tabSummary jika belum ada
-    const savedTab = localStorage.getItem("activeTab");
-    const validAdminTabs = ["tabSummary", "tabEmployees", "tabRecap"];
-    const targetTab = validAdminTabs.includes(savedTab) ? savedTab : "tabSummary";
-
-    switchAdminTab(targetTab); // Membuka kembali tab terakhir yang aktif (misal: Rekap Absensi)
+    if(validEmpTabs.includes(savedTab)) switchEmployeeTab(savedTab);
+    else switchAdminTab(validAdminTabs.includes(savedTab) ? savedTab : "tabSummary");
     await loadEmployeesData();
   }
 }
@@ -269,7 +260,7 @@ function loadEmployeeProfileData() {
 }
 
 async function loadMyRows() {
-  const {data, error} = await supabaseClient.from("attendance").select("id,created_at,check_type,activity,latitude,longitude,photo_path").order("created_at",{ascending:false}).limit(30);
+  onst {data, error} = await supabaseClient.from("attendance").select("id,created_at,check_type,activity,latitude,longitude,photo_path").eq("user_id", currentUser.id).order("created_at",{ascending:false}).limit(30);
   if(error){ message("attendanceMsg", error.message, true); return; }
   
   if ($("myRows")) {
