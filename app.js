@@ -191,10 +191,8 @@ async function refreshUI() {
   }
   
   // Tampilkan grup menu sidebar yang sesuai peran
-  const adminMenuGroup = document.querySelector(".admin-menu-group");
-  const employeeMenuGroup = document.querySelector(".employee-menu-group");
-  if(adminMenuGroup) adminMenuGroup.classList.toggle("hidden", !isAdmin);
-  if(employeeMenuGroup) employeeMenuGroup.classList.toggle("hidden", !(isEmployee || isAdmin));
+  document.querySelectorAll(".admin-only").forEach(el => el.classList.toggle("hidden", !isAdmin));
+  document.querySelectorAll(".emp-item").forEach(el => el.classList.toggle("hidden", !(isEmployee || isAdmin)));
 
   show("adminArea", isAdmin);
 
