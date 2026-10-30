@@ -213,8 +213,8 @@ async function refreshUI() {
   }
 
   if(isAdmin) {
-    if(validEmpTabs.includes(savedTab)) switchEmployeeTab(savedTab);
-    else switchAdminTab(validAdminTabs.includes(savedTab) ? savedTab : "tabSummary");
+    if(validAdminTabs.includes(savedTab)) switchAdminTab(savedTab);
+    else switchEmployeeTab(validEmpTabs.includes(savedTab) ? savedTab : "tabEmpHome");
     await loadEmployeesData();
   }
 }
