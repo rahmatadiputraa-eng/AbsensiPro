@@ -77,16 +77,25 @@
 
     <div class="nav-section-title">MENU UTAMA</div>
 
-    <!-- MENU KHUSUS ADMIN -->
-    <nav class="nav-menu admin-menu-group hidden">
-      <button type="button" class="nav-item active" data-target="tabSummary">
+    <!-- MENU UTAMA: urutan Beranda, Riwayat, Ringkasan, Karyawan, Rekap Absensi, Profil -->
+    <nav class="nav-menu">
+      <button type="button" class="nav-item emp-item active" data-target="tabEmpHome">
+        <span class="nav-icon">🏠</span><span class="nav-label">Beranda</span>
+      </button>
+      <button type="button" class="nav-item emp-item" data-target="tabEmpHistory">
+        <span class="nav-icon">🕒</span><span class="nav-label">Riwayat</span>
+      </button>
+      <button type="button" class="nav-item admin-only hidden" data-target="tabSummary">
         <span class="nav-icon">📊</span><span class="nav-label">Ringkasan</span>
       </button>
-      <button type="button" class="nav-item" data-target="tabEmployees">
+      <button type="button" class="nav-item admin-only hidden" data-target="tabEmployees">
         <span class="nav-icon">👥</span><span class="nav-label">Karyawan</span>
       </button>
-      <button type="button" class="nav-item" data-target="tabRecap">
+      <button type="button" class="nav-item admin-only hidden" data-target="tabRecap">
         <span class="nav-icon">📑</span><span class="nav-label">Rekap Absensi</span>
+      </button>
+      <button type="button" class="nav-item emp-item" data-target="tabEmpProfile">
+        <span class="nav-icon">👤</span><span class="nav-label">Profil</span>
       </button>
     </nav>
 
