@@ -190,7 +190,7 @@ async function refreshUI() {
     $("welcome").textContent = "Dashboard Admin";
   }
   
-   // Tampilkan grup menu sidebar yang sesuai peran
+  // Tampilkan grup menu sidebar yang sesuai peran
   const adminMenuGroup = document.querySelector(".admin-menu-group");
   const employeeMenuGroup = document.querySelector(".employee-menu-group");
   if(adminMenuGroup) adminMenuGroup.classList.toggle("hidden", !isAdmin);
@@ -260,7 +260,7 @@ function loadEmployeeProfileData() {
 }
 
 async function loadMyRows() {
-  onst {data, error} = await supabaseClient.from("attendance").select("id,created_at,check_type,activity,latitude,longitude,photo_path").eq("user_id", currentUser.id).order("created_at",{ascending:false}).limit(30);
+  const {data, error} = await supabaseClient.from("attendance").select("id,created_at,check_type,activity,latitude,longitude,photo_path").eq("user_id", currentUser.id).order("created_at",{ascending:false}).limit(30);
   if(error){ message("attendanceMsg", error.message, true); return; }
   
   if ($("myRows")) {
@@ -462,6 +462,7 @@ function setActiveNav(targetId) {
 }
 
 function switchEmployeeTab(targetId) {
+  document.querySelectorAll(".admin-tab-content").forEach(el => el.classList.add("hidden"));
   document.querySelectorAll(".emp-tab-content").forEach(el => el.classList.add("hidden"));
   show(targetId, true);
   setActiveNav(targetId);
@@ -474,6 +475,8 @@ function switchEmployeeTab(targetId) {
 function switchAdminTab(targetId) {
   // Sembunyikan semua tab admin, lalu tampilkan hanya tab yang dituju
   document.querySelectorAll(".admin-tab-content").forEach(el => el.classList.add("hidden"));
+  document.querySelectorAll(".emp-tab-content").forEach(el => el.classList.add("hidden"));
+  stopLiveMap(false);
   show(targetId, true);
   setActiveNav(targetId);
 
