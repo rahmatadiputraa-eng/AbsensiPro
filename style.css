@@ -200,6 +200,10 @@ th {
   margin-bottom: 1.5rem; /* Menambah jarak bawah agar lebih rapi dari form input */
 }
 
+#loginBtn {
+  margin-top: 16px;
+}
+
 .modal-panel {
   position: fixed;
   top: 10%;
