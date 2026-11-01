@@ -205,6 +205,11 @@ th {
   width: 100%;
 }
 
+#registerBtn {
+  margin-top: 16px;
+  width: 100%;
+}
+
 .modal-panel {
   position: fixed;
   top: 10%;
