@@ -229,8 +229,8 @@ th {
 }
 
 .login-logo {
-  width: 76px;
-  height: 76px;
+  width: 100px;
+  height: 100px;
   border-radius: 16px;
   object-fit: cover;
   margin-bottom: 12px;
