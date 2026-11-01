@@ -210,6 +210,11 @@ th {
   width: 100%;
 }
 
+#forgotBtn {
+  margin-top: 16px;
+  width: 100%;
+}
+
 .modal-panel {
   position: fixed;
   top: 10%;
