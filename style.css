@@ -228,6 +228,15 @@ th {
   flex-wrap: wrap;
 }
 
+.login-logo {
+  width: 76px;
+  height: 76px;
+  border-radius: 16px;
+  object-fit: cover;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
 .gap-sm { gap: 8px; }
 .gap-md { gap: 16px; }
 .spread { justify-content: space-between; }
