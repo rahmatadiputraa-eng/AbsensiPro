@@ -1089,7 +1089,7 @@ async function buildRecapPdf() {
       styles: { fontSize: 8, valign: "middle", minCellHeight: 20 },
       headStyles: { fillColor: [21, 94, 117], halign: "center", minCellHeight: 8 },
       columnStyles: {
-        0: { cellWidth: 10 }, 1: { cellWidth: 20 }, 2: { cellWidth: 14 }, 3: { cellWidth: 24 },
+        0: { cellWidth: 10 }, 1: { cellWidth: 20 }, 2: { cellWidth: 18 }, 3: { cellWidth: 24 },
         4: { cellWidth: 34 }, 5: { cellWidth: 14 }, 6: { cellWidth: 24 }, 7: { cellWidth: 34 }
       },
       didParseCell: (data) => {
