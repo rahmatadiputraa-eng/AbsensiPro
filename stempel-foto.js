@@ -1,13 +1,16 @@
 // stempel-foto.js
-// Menempelkan STEMPEL pada foto selfie absensi sebelum diunggah:
-//   logo perusahaan, nama karyawan, nama pekerjaan, kegiatan, tanggal & jam,
-//   koordinat lokasi (+akurasi GPS), dan jenis absensi (CHECK-IN / CHECK-OUT).
+// Menempelkan STEMPEL pada foto selfie absensi sebelum diunggah (tanpa kotak latar):
+//   - Pojok kiri atas  : label CHECK-IN / CHECK-OUT
+//   - Pojok kanan atas : logo perusahaan (PU_APN_K3.png)
+//   - Kiri bawah       : nama karyawan, nama pekerjaan, kegiatan, tanggal & jam,
+//                        koordinat lokasi (+akurasi GPS) -> teks putih dengan bayangan tipis
 // Stempel dibuat oleh aplikasi (bukan aplikasi kamera pihak ketiga), jadi seragam di semua HP
 // dan tidak bisa diubah pengguna. Waktu mengikuti jam server bila jam-server.js terpasang.
 //
 // Cara pasang: di index.html, SETELAH <script src="app.js"></script> (dan setelah jam-server.js
 // bila dipakai) tambahkan:
 //   <script src="stempel-foto.js"></script>
+// Unggah juga file logo PU_APN_K3.png ke folder yang sama dengan index.html.
 // File ini tidak mengubah app.js. Caranya: membungkus fungsi getLocation() milik app.js.
 // Fungsi itu dipanggil tepat sebelum foto diunggah, sehingga koordinat pada stempel
 // sama persis dengan koordinat yang tersimpan di database.
@@ -18,9 +21,15 @@
   const CFG = {
     TIMEZONE: "Asia/Makassar",          // Asia/Jakarta = WIB, Asia/Makassar = WITA, Asia/Jayapura = WIT
     ZONE_LABELS: { "Asia/Jakarta": "WIB", "Asia/Makassar": "WITA", "Asia/Jayapura": "WIT" },
-    LOGO_CANDIDATES: ["#headerLogo", "Logo Palma.png", "icon-192.png"],   // dicoba berurutan
+    LOGO_CANDIDATES: ["PU_APN_K3.png", "#headerLogo", "Logo Palma.png", "icon-192.png"],   // dicoba berurutan
+    LOGO_MAX_W: 0.36,       // lebar logo maksimal = 36% lebar foto
+    LOGO_MAX_H: 0.16,       // tinggi logo maksimal = 16% tinggi foto
+    TEXT_SIZE: 0.029,       // ukuran huruf = 2,9% lebar foto
+    TEXT_MAX_H: 0.40,       // blok teks maksimal 40% tinggi foto (huruf mengecil otomatis bila lebih)
+    SHADOW: "rgba(0,0,0,0.7)",
+    LABEL_AS_PILL: true,    // true = label CHECK-IN/OUT berlatar warna; false = teks putih biasa
     JPEG_QUALITY: 0.85,
-    FAIL_OPEN: false      // false = absensi dibatalkan bila stempel gagal dibuat; true = tetap kirim tanpa stempel
+    FAIL_OPEN: false        // false = absensi dibatalkan bila stempel gagal dibuat; true = tetap kirim tanpa stempel
   };
 
   let last = null;        // { orig, stamped } agar percobaan kirim ulang tidak menumpuk stempel
@@ -137,15 +146,15 @@
   function render(ctx, W, H, bitmap, logo, info) {
     ctx.drawImage(bitmap, 0, 0, W, H);
 
-    let base = Math.max(13, Math.round(W * 0.03));
-    let layout;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const pad = Math.round(base * 0.7), lh = Math.round(base * 1.3);
-      const logoSize = logo ? Math.round(lh * 3.2) : 0;
-      const textX = pad + (logoSize ? logoSize + pad : 0);
-      const maxW = W - textX - pad;
+    const pad = Math.round(W * 0.025);
+    let base = Math.max(13, Math.round(W * CFG.TEXT_SIZE));
+    let rows = [], lh = 0;
 
-      const rows = [];
+    // Susun baris teks; huruf mengecil otomatis bila blok teks terlalu tinggi
+    for (let attempt = 0; attempt < 6; attempt++) {
+      lh = Math.round(base * 1.3);
+      const maxW = W - pad * 2;
+      rows = [];
       const add = (text, opts, maxLines) => {
         ctx.font = `${opts.bold ? "bold " : ""}${opts.size}px sans-serif`;
         wrapText(ctx, text, maxW, maxLines || 1).forEach((t) => rows.push({ t, ...opts }));
@@ -156,51 +165,57 @@
       add(info.date, { size: base }, 1);
       add(info.time, { bold: true, size: base }, 1);
       add(`Lokasi: ${info.lat}, ${info.lon} (±${info.acc} m)`, { size: Math.round(base * 0.95) }, 2);
-
-      const panelH = pad * 2 + rows.length * lh;
-      layout = { pad, lh, logoSize, textX, rows, panelH };
-      if (panelH <= H * 0.5) break;
-      base = Math.round(base * 0.88);
+      if (rows.length * lh <= H * CFG.TEXT_MAX_H) break;
+      base = Math.round(base * 0.9);
     }
 
-    const { pad, lh, logoSize, textX, rows, panelH } = layout;
-    const top = H - panelH;
-
-    // Panel gelap semi-transparan di bagian bawah
-    ctx.fillStyle = "rgba(0,0,0,0.62)";
-    ctx.fillRect(0, top, W, panelH);
-
-    // Logo (latar putih agar terlihat di panel gelap)
-    if (logo) {
-      const box = logoSize;
-      const y = top + Math.round((panelH - box) / 2);
-      ctx.fillStyle = "rgba(255,255,255,0.94)";
-      ctx.fillRect(pad, y, box, box);
-      const inner = Math.round(box * 0.86);
-      const s = Math.min(inner / logo.width, inner / logo.height);
-      const lw = Math.round(logo.width * s), lhh = Math.round(logo.height * s);
-      ctx.drawImage(logo, pad + Math.round((box - lw) / 2), y + Math.round((box - lhh) / 2), lw, lhh);
-    }
-
-    // Teks
+    const shadowOn = () => {
+      ctx.shadowColor = CFG.SHADOW;
+      ctx.shadowBlur = Math.max(2, Math.round(base * 0.18));
+      ctx.shadowOffsetX = Math.max(1, Math.round(base * 0.06));
+      ctx.shadowOffsetY = Math.max(1, Math.round(base * 0.06));
+    };
+    const shadowOff = () => {
+      ctx.shadowColor = "rgba(0,0,0,0)";
+      ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+    };
     ctx.textBaseline = "top";
+
+    // 1) Blok teks di kiri bawah (tanpa kotak latar, bayangan tipis)
+    const top = H - pad - rows.length * lh;
+    shadowOn();
     ctx.fillStyle = "#ffffff";
     rows.forEach((r, i) => {
       ctx.font = `${r.bold ? "bold " : ""}${r.size}px sans-serif`;
-      ctx.fillText(r.t, textX, top + pad + i * lh + Math.round((lh - r.size) / 2));
+      ctx.fillText(r.t, pad, top + i * lh + Math.round((lh - r.size) / 2));
     });
 
-    // Label jenis absensi di pojok kanan atas foto
+    // 2) Label CHECK-IN / CHECK-OUT di kiri atas
     const label = info.isCheckIn ? "CHECK-IN" : "CHECK-OUT";
     const fs = Math.round(base * 1.05);
     ctx.font = `bold ${fs}px sans-serif`;
-    const tw = ctx.measureText(label).width, px = Math.round(fs * 0.7), ph = Math.round(fs * 1.7);
-    ctx.fillStyle = info.isCheckIn ? "#15803d" : "#c2410c";
-    ctx.fillRect(W - tw - px * 2 - pad, pad, tw + px * 2, ph);
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(label, W - tw - px - pad, pad + Math.round((ph - fs) / 2));
+    const tw = ctx.measureText(label).width;
+    if (CFG.LABEL_AS_PILL) {
+      shadowOff();
+      const px = Math.round(fs * 0.7), ph = Math.round(fs * 1.7);
+      ctx.fillStyle = info.isCheckIn ? "#15803d" : "#c2410c";
+      ctx.fillRect(pad, pad, tw + px * 2, ph);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, pad + px, pad + Math.round((ph - fs) / 2));
+    } else {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, pad, pad);
+    }
 
-    return layout;
+    // 3) Logo perusahaan di kanan atas (tanpa latar dan tanpa bayangan)
+    shadowOff();
+    if (logo) {
+      const sc = Math.min((W * CFG.LOGO_MAX_W) / logo.width, (H * CFG.LOGO_MAX_H) / logo.height);
+      const lw = Math.round(logo.width * sc), lhh = Math.round(logo.height * sc);
+      ctx.drawImage(logo, W - pad - lw, pad, lw, lhh);
+    }
+
+    return { pad, lh, rows, top, base };
   }
 
   async function toBitmap(blob) {
