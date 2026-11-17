@@ -1056,7 +1056,7 @@ async function buildRecapPdf() {
     // Kop laporan
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
-    doc.text("LAPORAN REKAP ABSENSI KARYAWAN", pageW / 2, 14, { align: "center" });
+    doc.text("REKAP ABSENSI KEGIATAN HARIAN", pageW / 2, 14, { align: "center" });
     doc.setFontSize(11);
     doc.text("PT. AGRINAS PALMA NUSANTARA", pageW / 2, 20, { align: "center" });
     doc.setLineWidth(0.6);
