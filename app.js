@@ -291,12 +291,14 @@ function resetAttendanceForm() {
   if (prev) { prev.removeAttribute("src"); }
   if ($("selfieInput")) $("selfieInput").value = "";
   if ($("activityInput")) $("activityInput").value = "";
+  if ($("locationInput")) $("locationInput").value = "";
   show("photoPreview", false);
   show("captureBtn", false);
   show("retakeBtn", false);
   show("attendanceBtn", false);
   show("cameraSection", false);
   show("activityGroup", false);
+  show("locationGroup", false);
   show("camInstruction", true);
   message("attendanceMsg", "");
   if ($("myRows")) $("myRows").innerHTML = "";
@@ -314,6 +316,7 @@ function initCamera(type) {
   if ($("selfieInput")) { $("selfieInput").value = ""; }
 
   show("activityGroup", isCheckIn);
+  show("locationGroup", isCheckIn);
   show("cameraSection", true);
   show("camInstruction", false);
   show("photoPreview", false);
@@ -392,6 +395,7 @@ if ($("selfieInput")) $("selfieInput").onchange = async (ev) => {
 async function submitAttendance() {
   const isCheckIn = (currentCheckType === "check_in");
   const activity = isCheckIn ? $("activityInput").value.trim() : "-";
+  const locationName = isCheckIn ? ($("locationInput")?.value || "").trim() : "";
 
   if (!capturedBlob) {
     message("attendanceMsg", "Harap ambil foto selfie terlebih dahulu.", true);
@@ -399,6 +403,10 @@ async function submitAttendance() {
   }
   if (isCheckIn && !activity) {
     message("attendanceMsg", "Harap isi kegiatan / pekerjaan utama Anda.", true);
+    return;
+  }
+  if (isCheckIn && !locationName) {
+    message("attendanceMsg", "Harap isi lokasi (Nama D.I atau Kabupaten).", true);
     return;
   }
 
@@ -417,6 +425,7 @@ async function submitAttendance() {
       user_id: currentUser.id, 
       check_type: currentCheckType,
       activity: activity,
+      location_name: locationName || null,
       latitude: loc.lat, 
       longitude: loc.lon, 
       accuracy_m: loc.accuracy,
@@ -437,7 +446,7 @@ async function submitAttendance() {
     show("cameraSection", false);
     show("camInstruction", true);
     show("attendanceBtn", false);
-    if (isCheckIn) $("activityInput").value = "";
+    if (isCheckIn) { $("activityInput").value = ""; if ($("locationInput")) $("locationInput").value = ""; }
     
     await loadEmployeeDashboardStats();
     await loadMyRows();
@@ -678,7 +687,73 @@ function groupRecapByEmployee() {
     }
     map.get(r.userId).rows.push(r);
   });
-  return Array.from(map.values());
+  const groups = Array.from(map.values());
+  groups.forEach(g => { g.lokasiProyek = lokasiProyekText(g.rows); });
+  return groups;
+}
+
+// Lokasi proyek = gabungan lokasi unik yang diinput saat check-in, contoh: "Kab. Bone & Kab. Soppeng"
+function lokasiProyekText(rows) {
+  const seen = new Set();
+  const list = [];
+  rows.forEach(r => {
+    const v = (r.lokasi || "").trim();
+    if (!v || v === "-") return;
+    const k = v.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    list.push(v);
+  });
+  return list.length ? list.join(" & ") : "-";
+}
+
+// "2026-11-05" -> "Nov-26"
+const BULAN_SINGKAT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+function fmtKeyToMonthShort(key) {
+  if (!key) return "";
+  const [y, m] = key.split("-");
+  return `${BULAN_SINGKAT[Number(m) - 1] || m}-${String(y).slice(-2)}`;
+}
+
+// Label & isi kolom periode pada kop rekap: satu bulan -> "BULAN | Nov-26", lebih dari satu bulan -> "PERIODE | Nov-26 s/d Jan-27"
+function recapMonthInfo() {
+  const { start, end } = recapPeriodRange();
+  if (!start && !end) return { label: "BULAN", value: "-" };
+  const a = fmtKeyToMonthShort(start || end);
+  const b = fmtKeyToMonthShort(end || start);
+  return a === b ? { label: "BULAN", value: a } : { label: "PERIODE", value: `${a} s/d ${b}` };
+}
+
+// Logo perusahaan untuk kop export (dimuat sekali, null bila gagal sehingga export tetap jalan tanpa logo)
+let logoAssetPromise = null;
+function loadLogoAsset() {
+  if (!logoAssetPromise) {
+    logoAssetPromise = (async () => {
+      try {
+        const res = await fetch("logo-agrinas.png");
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const blob = await res.blob();
+        const dataUrl = await new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(fr.result);
+          fr.onerror = () => reject(fr.error);
+          fr.readAsDataURL(blob);
+        });
+        const dims = await new Promise((resolve, reject) => {
+          const im = new Image();
+          im.onload = () => resolve({ w: im.naturalWidth, h: im.naturalHeight });
+          im.onerror = () => reject(new Error("Logo tidak valid"));
+          im.src = dataUrl;
+        });
+        return { dataUrl, w: dims.w, h: dims.h };
+      } catch (err) {
+        console.warn("Logo gagal dimuat:", err);
+        logoAssetPromise = null;
+        return null;
+      }
+    })();
+  }
+  return logoAssetPromise;
 }
 
 function countHadir(rows) {
@@ -713,7 +788,7 @@ function fitSize(t, maxW, maxH) {
   return { w: t.w * k, h: t.h * k };
 }
 
-async function blobToThumb(blob, maxW = 240) {
+async function blobToThumb(blob, maxW = 640) {
   const url = URL.createObjectURL(blob);
   try {
     const img = new Image();
@@ -723,7 +798,7 @@ async function blobToThumb(blob, maxW = 240) {
     canvas.width = Math.round(img.width * scale);
     canvas.height = Math.round(img.height * scale);
     canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-    return { dataUrl: canvas.toDataURL("image/jpeg", 0.75), w: canvas.width, h: canvas.height };
+    return { dataUrl: canvas.toDataURL("image/jpeg", 0.85), w: canvas.width, h: canvas.height };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -786,7 +861,7 @@ async function loadRecapData() {
 
   let query = supabaseClient
     .from("attendance")
-    .select("id,user_id,created_at,check_type,activity,photo_path,latitude,longitude,profiles(full_name,email,jabatan)")
+    .select("id,user_id,created_at,check_type,activity,location_name,photo_path,latitude,longitude,profiles(full_name,email,jabatan)")
     .order("created_at", { ascending: false })
     .limit(1000);
 
@@ -829,6 +904,7 @@ async function loadRecapData() {
         checkIn: "-",
         checkOut: "-",
         activity: r.activity || "-",
+        lokasi: "-",
         photoIn: "",
         photoOut: "",
         locIn: null,
@@ -839,6 +915,7 @@ async function loadRecapData() {
     if (r.check_type === 'check_in') {
       g.checkIn = fmtTimeOnly(r.created_at);
       if (r.activity) g.activity = r.activity;
+      if (r.location_name) g.lokasi = r.location_name;
       g.photoIn = r.photo_path || "";
       g.locIn = makeLoc(r.latitude, r.longitude);
     }
@@ -862,6 +939,7 @@ async function loadRecapData() {
         <td>${escapeHtml(r.name)}</td>
         <td>${escapeHtml(r.checkIn)}</td>
         <td>${escapeHtml(r.checkOut)}</td>
+        <td>${escapeHtml(r.lokasi)}</td>
         <td>${escapeHtml(r.activity)}</td>
         <td>${r.photoIn ? `<button type="button" class="secondary" data-photo="${escapeHtml(r.photoIn)}">Lihat Foto</button>` : "—"}</td>
       </tr>
@@ -910,16 +988,19 @@ async function ensureExcelJS() {
 
 async function buildRecapExcel() {
   const groups = groupRecapByEmployee();
-  const period = recapPeriodText();
+  const mo = recapMonthInfo();
+  const logo = await loadLogoAsset();
   const wb = new ExcelJS.Workbook();
   wb.creator = "AbsensiPro";
   wb.created = new Date();
+  const logoId = logo ? wb.addImage({ base64: logo.dataUrl, extension: "png" }) : null;
 
   const usedNames = new Set();
   const thin = { style: "thin" };
   const border = { top: thin, left: thin, bottom: thin, right: thin };
-  const LAST_COL = "H";
-  const HEADERS = ["Tanggal", "Jam Check-in", "Foto Check-in", "Lokasi Check-in", "Jam Check-out", "Foto Check-out", "Lokasi Check-out", "Kegiatan"];
+  const COLS = "ABCDEFGHI".split("");
+  const BLUE = "FFA6C9EB";
+  const HEADERS = ["Tanggal", "Jam Check-in", "Foto Check-in", "Lokasi Check-in", "Jam Check-out", "Foto Check-out", "Lokasi Check-out", "Lokasi Kerja", "Kegiatan"];
   const PHOTO_W = 100, PHOTO_H = 72;
 
   groups.forEach((g, idx) => {
@@ -931,35 +1012,59 @@ async function buildRecapExcel() {
     const ws = wb.addWorksheet(sheetName, {
       pageSetup: { orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
     });
-    ws.columns = [{ width: 18 }, { width: 13 }, { width: 16 }, { width: 24 }, { width: 13 }, { width: 16 }, { width: 24 }, { width: 45 }];
+    ws.columns = [{ width: 18 }, { width: 13 }, { width: 16 }, { width: 24 }, { width: 13 }, { width: 16 }, { width: 24 }, { width: 24 }, { width: 45 }];
 
-    // Kop
-    ws.mergeCells(`A1:${LAST_COL}1`);
-    ws.getCell("A1").value = "LAPORAN REKAP ABSENSI KARYAWAN";
-    ws.getCell("A1").font = { bold: true, size: 14 };
-    ws.getCell("A1").alignment = { horizontal: "center" };
-    ws.mergeCells(`A2:${LAST_COL}2`);
-    ws.getCell("A2").value = "PT. AGRINAS PALMA NUSANTARA";
-    ws.getCell("A2").font = { bold: true, size: 11 };
-    ws.getCell("A2").alignment = { horizontal: "center" };
+    // Kop: logo di kiri atas, judul di tengah
+    ws.getRow(1).height = 30;
+    ws.getRow(2).height = 30;
+    ws.getRow(3).height = 8;
+    if (logoId !== null) {
+      const lw = 215;
+      ws.addImage(logoId, { tl: { col: 0.1, row: 0.1 }, ext: { width: lw, height: lw * logo.h / logo.w } });
+    }
+    ws.mergeCells("C1:I1");
+    ws.getCell("C1").value = "LAPORAN REKAP ABSENSI KARYAWAN";
+    ws.getCell("C1").font = { bold: true, size: 14 };
+    ws.getCell("C1").alignment = { horizontal: "center", vertical: "middle" };
+    ws.mergeCells("C2:I2");
+    ws.getCell("C2").value = "PT. AGRINAS PALMA NUSANTARA";
+    ws.getCell("C2").font = { bold: true, size: 11 };
+    ws.getCell("C2").alignment = { horizontal: "center", vertical: "middle" };
 
-    const info = [
-      ["Nama Pekerjaan", g.namaPekerjaan],
-      ["Nama", g.name],
-      ["Jabatan", g.jabatan],
-      ["Periode", period],
-      ["Jumlah Hari Hadir", `${countHadir(g.rows)} hari`]
-    ];
-    info.forEach(([label, val], i) => {
-      const r = 4 + i;
-      ws.getCell(`A${r}`).value = label;
-      ws.getCell(`A${r}`).font = { bold: true };
-      ws.mergeCells(`B${r}:${LAST_COL}${r}`);
-      ws.getCell(`B${r}`).value = `: ${val}`;
-    });
+    // Blok identitas (gaya tabel biru): NAMA | JABATAN | BULAN | JUMLAH HARI, lalu NAMA PROYEK | LOKASI PROYEK
+    const putBlock = (row, from, to, text, { head = false, bold = false } = {}) => {
+      ws.mergeCells(`${from}${row}:${to}${row}`);
+      for (let i = COLS.indexOf(from); i <= COLS.indexOf(to); i++) {
+        const c = ws.getCell(`${COLS[i]}${row}`);
+        c.border = border;
+        if (head) c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLUE } };
+      }
+      const cell = ws.getCell(`${from}${row}`);
+      cell.value = text;
+      cell.font = { bold: head || bold, size: 11 };
+      cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    };
 
-    // Header tabel (baris 10; info karyawan di baris 4-8)
-    const headRow = ws.getRow(10);
+    putBlock(4, "A", "C", "NAMA", { head: true });
+    putBlock(4, "D", "F", "JABATAN", { head: true });
+    putBlock(4, "G", "H", mo.label, { head: true });
+    putBlock(4, "I", "I", "JUMLAH HARI HADIR", { head: true });
+    putBlock(5, "A", "C", g.name);
+    putBlock(5, "D", "F", g.jabatan);
+    putBlock(5, "G", "H", mo.value, { bold: true });
+    putBlock(5, "I", "I", `${countHadir(g.rows)} hari`, { bold: true });
+    putBlock(6, "A", "E", "NAMA PROYEK", { head: true });
+    putBlock(6, "F", "I", "LOKASI PROYEK", { head: true });
+    putBlock(7, "A", "E", g.namaPekerjaan, { bold: true });
+    putBlock(7, "F", "I", g.lokasiProyek, { bold: true });
+    ws.getRow(4).height = 20;
+    ws.getRow(5).height = 22;
+    ws.getRow(6).height = 20;
+    ws.getRow(7).height = 36;
+    ws.getRow(8).height = 8;
+
+    // Header tabel (baris 9; kop dan identitas di baris 1-7)
+    const headRow = ws.getRow(9);
     HEADERS.forEach((t, i) => {
       const c = headRow.getCell(i + 1);
       c.value = t;
@@ -980,6 +1085,7 @@ async function buildRecapExcel() {
         r.checkOut,
         photoCellText(r.photoOut),
         "",
+        r.lokasi,
         r.activity
       ]);
       row.height = 60; // ~80 px, cukup untuk foto
@@ -996,7 +1102,7 @@ async function buildRecapExcel() {
 
       row.eachCell({ includeEmpty: true }, (cell, col) => {
         cell.border = border;
-        cell.alignment = { vertical: "middle", horizontal: col === 8 ? "left" : "center", wrapText: true };
+        cell.alignment = { vertical: "middle", horizontal: col === 9 ? "left" : "center", wrapText: true };
       });
 
       // Tempel foto di kolom C (indeks 2) dan F (indeks 5)
@@ -1048,10 +1154,17 @@ async function buildRecapPdf() {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const groups = groupRecapByEmployee();
-  const period = recapPeriodText();
+  const mo = recapMonthInfo();
+  const logo = await loadLogoAsset();
 
   groups.forEach((g, idx) => {
     if (idx > 0) doc.addPage();
+
+    // Logo di sudut kiri atas
+    if (logo) {
+      const lh = 16;
+      doc.addImage(logo.dataUrl, "PNG", 14, 7, lh * logo.w / logo.h, lh);
+    }
 
     // Kop laporan
     doc.setFont("helvetica", "bold");
@@ -1060,37 +1173,47 @@ async function buildRecapPdf() {
     doc.setFontSize(11);
     doc.text("PT. AGRINAS PALMA NUSANTARA", pageW / 2, 20, { align: "center" });
     doc.setLineWidth(0.6);
-    doc.line(14, 24, pageW - 14, 24);
+    doc.line(14, 26, pageW - 14, 26);
 
-    // Identitas karyawan
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    const info = [
-      ["Nama Pekerjaan", g.namaPekerjaan],
-      ["Nama", g.name],
-      ["Jabatan", g.jabatan],
-      ["Periode", period],
-      ["Jumlah Hari Hadir", `${countHadir(g.rows)} hari`]
-    ];
-    info.forEach(([label, val], i) => {
-      const y = 31 + i * 6;
-      doc.text(label, 14, y);
-      doc.text(`: ${val}`, 55, y);
+    // Blok identitas (gaya tabel biru): NAMA | JABATAN | BULAN | JUMLAH HARI, lalu NAMA PROYEK | LOKASI PROYEK
+    const W = pageW - 28;
+    const blockBase = {
+      theme: "grid",
+      margin: { left: 14, right: 14 },
+      tableWidth: W,
+      styles: { fontSize: 9, halign: "center", valign: "middle", cellPadding: 2, lineWidth: 0.2, lineColor: 0, textColor: 0 },
+      headStyles: { fillColor: [166, 201, 235], textColor: 0, fontStyle: "bold", halign: "center" }
+    };
+    doc.autoTable({
+      ...blockBase,
+      startY: 30,
+      head: [["NAMA", "JABATAN", mo.label, "JUMLAH HARI HADIR"]],
+      body: [[g.name, g.jabatan, mo.value, `${countHadir(g.rows)} hari`]],
+      columnStyles: { 0: { cellWidth: W * 0.24 }, 1: { cellWidth: W * 0.30 }, 2: { cellWidth: W * 0.24 }, 3: { cellWidth: W * 0.22 } },
+      didParseCell: (d) => { if (d.section === "body" && d.column.index >= 2) d.cell.styles.fontStyle = "bold"; }
+    });
+    doc.autoTable({
+      ...blockBase,
+      startY: doc.lastAutoTable.finalY,
+      head: [["NAMA PROYEK", "LOKASI PROYEK"]],
+      body: [[g.namaPekerjaan, g.lokasiProyek]],
+      columnStyles: { 0: { cellWidth: W * 0.45 }, 1: { cellWidth: W * 0.55 } },
+      bodyStyles: { fontStyle: "bold" }
     });
 
     doc.autoTable({
-      startY: 31 + info.length * 6 + 2,
-      head: [["No", "Tanggal", "Check-in", "Foto\nCheck-in", "Lokasi\nCheck-in", "Check-out", "Foto\nCheck-out", "Lokasi\nCheck-out", "Kegiatan"]],
+      startY: doc.lastAutoTable.finalY + 4,
+      head: [["No", "Tanggal", "Check-in", "Foto\nCheck-in", "Lokasi\nCheck-in", "Check-out", "Foto\nCheck-out", "Lokasi\nCheck-out", "Lokasi\nKerja", "Kegiatan"]],
       body: g.rows.map((r, i) => [
         i + 1, r.date, r.checkIn, photoCellText(r.photoIn), fmtCoord(r.locIn),
-        r.checkOut, photoCellText(r.photoOut), fmtCoord(r.locOut), r.activity
+        r.checkOut, photoCellText(r.photoOut), fmtCoord(r.locOut), r.lokasi, r.activity
       ]),
       theme: "grid",
       styles: { fontSize: 8, valign: "middle", minCellHeight: 20 },
       headStyles: { fillColor: [21, 94, 117], halign: "center", minCellHeight: 8 },
       columnStyles: {
         0: { cellWidth: 10 }, 1: { cellWidth: 20 }, 2: { cellWidth: 18 }, 3: { cellWidth: 24 },
-        4: { cellWidth: 34 }, 5: { cellWidth: 14 }, 6: { cellWidth: 24 }, 7: { cellWidth: 34 }
+        4: { cellWidth: 34 }, 5: { cellWidth: 14 }, 6: { cellWidth: 24 }, 7: { cellWidth: 34 }, 8: { cellWidth: 30 }
       },
       didParseCell: (data) => {
         if (data.section !== "body") return;
